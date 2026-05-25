@@ -1,35 +1,29 @@
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-interface GlassCardProps {
+interface SurfaceCardProps {
   children?: React.ReactNode;
   className?: string;
-  hover?: boolean;
+  interactive?: boolean;
   glow?: boolean;
   onClick?: () => void;
-  delay?: number;
 }
 
-export function GlassCard({ children, className, hover = true, glow = false, onClick, delay = 0 }: GlassCardProps) {
+export function GlassCard({ children, className, interactive = false, glow = false, onClick }: SurfaceCardProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay }}
+    <div
       className={cn(
         "rounded-xl border border-white/[0.08] relative overflow-hidden",
-        hover && "transition-all duration-300 hover:border-purple-500/20 hover:bg-white/[0.06] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-500/10",
-        glow && "animate-pulse-glow",
-        onClick && "cursor-pointer",
+        "bg-white/[0.03] backdrop-blur-xl",
+        interactive && "transition-all duration-200 hover:border-purple-500/20 hover:bg-white/[0.055] hover:-translate-y-px hover:shadow-lg hover:shadow-purple-500/[0.07] cursor-pointer",
+        glow && "glow-pulse",
         className
       )}
-      style={{ background: "rgba(255,255,255,0.03)", backdropFilter: "blur(20px)" }}
       onClick={onClick}
     >
       {glow && (
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-pink-500/5 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/[0.04] to-transparent pointer-events-none" />
       )}
       <div className="relative z-10">{children}</div>
-    </motion.div>
+    </div>
   );
 }

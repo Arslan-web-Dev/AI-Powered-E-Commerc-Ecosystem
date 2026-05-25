@@ -1,142 +1,116 @@
 import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { MessageCircle, X, Send, Bot, User, Sparkles } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 
+type Message = { role: "user" | "assistant"; text: string };
+
+const INITIAL: Message[] = [
+  { role: "assistant", text: "Hi! I can help you find products, check order status, or answer questions about the store." },
+];
+
 export function AIChatbot() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [message, setMessage] = useState("");
-  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).slice(2)}`);
-  const [chatHistory, setChatHistory] = useState<{ role: "user" | "assistant"; message: string }[]>([
-    { role: "assistant", message: "Hello! I'm NexusAI, your personal shopping assistant. I can help you find products, track orders, provide recommendations, and answer any questions. How can I help you today?" },
-  ]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [history, setHistory] = useState<Message[]>(INITIAL);
+  const [sessionId] = useState(() => `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
-  const chatMutation = trpc.ai.chat.useMutation({
+  const send = trpc.ai.chat.useMutation({
     onSuccess: (data) => {
-      setChatHistory((prev) => [...prev, { role: "assistant", message: data.response }]);
+      setHistory((h) => [...h, { role: "assistant", text: data.response }]);
     },
   });
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
-  }, [chatHistory]);
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [history, send.isPending]);
 
-  const handleSend = () => {
-    if (!message.trim()) return;
-
-    setChatHistory((prev) => [...prev, { role: "user", message: message.trim() }]);
-    chatMutation.mutate({
-      message: message.trim(),
-      sessionId,
-      userId: user?.id,
-    });
-    setMessage("");
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+  const submit = () => {
+    const text = input.trim();
+    if (!text || send.isPending) return;
+    setHistory((h) => [...h, { role: "user", text }]);
+    send.mutate({ message: text, sessionId, userId: user?.id });
+    setInput("");
   };
 
   return (
     <>
-      {/* Floating button */}
-      <motion.button
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30"
-        style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
+      <button
+        onClick={() => setOpen(!open)}
+        className="fixed bottom-6 right-6 z-50 w-13 h-13 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/25 transition-transform hover:scale-105 active:scale-95"
+        style={{ width: 52, height: 52, background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
+        aria-label="Open chat"
       >
-        {isOpen ? (
-          <X size={24} className="text-white" />
-        ) : (
-          <div className="relative">
-            <MessageCircle size={24} className="text-white" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-400 border-2 border-[#0a0e1a]" />
-          </div>
-        )}
-      </motion.button>
+        {open ? <X size={20} className="text-white" /> : <MessageCircle size={20} className="text-white" />}
+      </button>
 
-      {/* Chat panel */}
       <AnimatePresence>
-        {isOpen && (
+        {open && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            initial={{ opacity: 0, y: 12, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-6 z-50 w-[380px] max-w-[calc(100vw-48px)] rounded-2xl border border-white/[0.08] shadow-2xl shadow-purple-500/10 overflow-hidden"
-            style={{ background: "rgba(12, 16, 30, 0.98)", backdropFilter: "blur(20px)" }}
+            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+            transition={{ duration: 0.18 }}
+            className="fixed bottom-[76px] right-6 z-50 w-80 md:w-[360px] rounded-2xl border border-white/[0.08] shadow-2xl shadow-black/50 overflow-hidden flex flex-col"
+            style={{ background: "rgba(10,14,26,0.97)", backdropFilter: "blur(20px)", maxHeight: "70vh" }}
           >
             {/* Header */}
-            <div className="px-4 py-3 border-b border-white/[0.06] flex items-center gap-3"
-              style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15))" }}
-            >
-              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
-                <Sparkles size={18} className="text-white" />
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06]">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
+              >
+                <Sparkles size={15} className="text-white" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white">NexusAI Assistant</h3>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                  <span className="text-xs text-gray-400">Online</span>
+                <p className="text-sm font-semibold text-white">NexusAI Assistant</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span className="text-[10px] text-white/35">Online</span>
                 </div>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="h-[360px] overflow-y-auto p-4 space-y-4">
-              {chatHistory.map((msg, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-                >
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    msg.role === "assistant"
-                      ? "bg-gradient-to-br from-indigo-500 to-purple-500"
-                      : "bg-gray-700"
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px]">
+              {history.map((msg, i) => (
+                <div key={i} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                    msg.role === "assistant" ? "bg-gradient-to-br from-indigo-500 to-purple-600" : "bg-white/[0.08]"
                   }`}>
-                    {msg.role === "assistant" ? <Bot size={14} className="text-white" /> : <User size={14} className="text-white" />}
+                    {msg.role === "assistant" ? <Bot size={12} className="text-white" /> : <User size={12} className="text-white/70" />}
                   </div>
-                  <div className={`max-w-[75%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                  <div className={`max-w-[76%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${
                     msg.role === "assistant"
-                      ? "bg-white/[0.06] text-gray-200 rounded-tl-sm"
-                      : "bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-tr-sm"
+                      ? "bg-white/[0.06] text-white/75 rounded-tl-sm"
+                      : "bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-tr-sm"
                   }`}>
-                    {msg.message}
+                    {msg.text}
                   </div>
-                </motion.div>
+                </div>
               ))}
-              {chatMutation.isPending && (
-                <div className="flex gap-2.5">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-500">
-                    <Bot size={14} className="text-white" />
+
+              {send.isPending && (
+                <div className="flex gap-2">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600">
+                    <Bot size={12} className="text-white" />
                   </div>
-                  <div className="px-3.5 py-2.5 rounded-2xl bg-white/[0.06] rounded-tl-sm">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </div>
+                  <div className="px-3 py-2.5 rounded-2xl rounded-tl-sm bg-white/[0.06] flex gap-1 items-center">
+                    {[0, 150, 300].map((d) => (
+                      <span
+                        key={d}
+                        className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce"
+                        style={{ animationDelay: `${d}ms` }}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
-              <div ref={messagesEndRef} />
+
+              <div ref={scrollRef} />
             </div>
 
             {/* Input */}
@@ -144,18 +118,18 @@ export function AIChatbot() {
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ask me anything..."
-                  className="flex-1 px-4 py-2.5 rounded-xl text-sm bg-white/[0.06] border border-white/[0.08] text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && submit()}
+                  placeholder="Ask anything…"
+                  className="field flex-1 py-2 text-sm"
                 />
                 <button
-                  onClick={handleSend}
-                  disabled={!message.trim() || chatMutation.isPending}
-                  className="p-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={submit}
+                  disabled={!input.trim() || send.isPending}
+                  className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 transition-all disabled:opacity-35"
                 >
-                  <Send size={16} className="text-white" />
+                  <Send size={15} className="text-white" />
                 </button>
               </div>
             </div>

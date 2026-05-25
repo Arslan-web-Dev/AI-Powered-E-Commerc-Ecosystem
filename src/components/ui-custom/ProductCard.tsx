@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { Heart, ShoppingCart, Eye } from "lucide-react";
 import { GlassCard } from "./GlassCard";
 import { StarRating } from "./StarRating";
@@ -7,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router";
 import { useToast } from "@/hooks/use-toast";
 
-interface ProductCardProps {
+interface Props {
   product: {
     id: number;
     name: string;
@@ -25,7 +24,9 @@ interface ProductCardProps {
   showReason?: boolean;
 }
 
-export function ProductCard({ product, index = 0, showReason = false }: ProductCardProps) {
+const FALLBACK_IMG = "https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=400";
+
+export function ProductCard({ product, index = 0, showReason = false }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -33,115 +34,108 @@ export function ProductCard({ product, index = 0, showReason = false }: ProductC
 
   const addToCart = trpc.cart.add.useMutation({
     onSuccess: () => {
-      toast({ title: "Added to cart!" });
+      toast({ title: "Added to cart" });
       utils.cart.get.invalidate();
     },
   });
 
   const toggleWishlist = trpc.wishlist.toggle.useMutation({
-    onSuccess: (data) => {
-      toast({ title: data.added ? "Added to wishlist!" : "Removed from wishlist!" });
+    onSuccess: (res) => {
+      toast({ title: res.added ? "Saved to wishlist" : "Removed from wishlist" });
       utils.wishlist.list.invalidate();
     },
   });
 
-  const imageUrl = product.primaryImage?.imageUrl || product.images?.[0]?.imageUrl || `https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=400`;
+  const img = product.primaryImage?.imageUrl || product.images?.[0]?.imageUrl || FALLBACK_IMG;
+  const price = Number(product.price);
+  const compare = Number(product.compareAtPrice);
+  const discountPct = compare > price ? Math.round((1 - price / compare) * 100) : 0;
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleCart = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) {
-      toast({ title: "Please login to add items to cart", variant: "destructive" });
+      toast({ title: "Sign in to add items to your cart", variant: "destructive" });
       return;
     }
     addToCart.mutate({ productId: product.id, quantity: 1 });
   };
 
-  const handleToggleWishlist = (e: React.MouseEvent) => {
+  const handleWishlist = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) {
-      toast({ title: "Please login to add to wishlist", variant: "destructive" });
+      toast({ title: "Sign in to save items", variant: "destructive" });
       return;
     }
     toggleWishlist.mutate({ productId: product.id });
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.05 }}
-    >
-      <GlassCard className="group cursor-pointer h-full" hover>
+    <div className="fade-in" style={{ animationDelay: `${index * 40}ms` }}>
+      <GlassCard className="group h-full" interactive>
         <div onClick={() => navigate(`/product/${product.slug}`)}>
-          {/* Image */}
           <div className="relative aspect-square overflow-hidden rounded-t-xl">
             <img
-              src={imageUrl}
+              src={img}
               alt={product.name}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.07]"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-            {/* Quick actions */}
-            <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
+            <div className="absolute top-2.5 right-2.5 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-1 group-hover:translate-x-0">
               <button
-                onClick={handleToggleWishlist}
-                className="p-2 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 hover:bg-purple-500/80 transition-colors"
+                onClick={handleWishlist}
+                className="p-1.5 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 hover:bg-rose-500/70 transition-colors"
               >
-                <Heart size={16} className="text-white" />
+                <Heart size={14} className="text-white" />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); navigate(`/product/${product.slug}`); }}
-                className="p-2 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 hover:bg-purple-500/80 transition-colors"
+                className="p-1.5 rounded-full bg-black/50 backdrop-blur-sm border border-white/10 hover:bg-indigo-500/70 transition-colors"
               >
-                <Eye size={16} className="text-white" />
+                <Eye size={14} className="text-white" />
               </button>
             </div>
 
             {showReason && product.reason && (
-              <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-full bg-purple-500/80 backdrop-blur-sm text-xs text-white font-medium">
+              <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-full bg-purple-600/75 backdrop-blur-sm text-[10px] text-white font-medium">
                 {product.reason}
               </div>
             )}
 
-            {product.compareAtPrice && Number(product.compareAtPrice) > Number(product.price) && (
-              <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-rose-500/80 backdrop-blur-sm text-xs text-white font-medium">
-                {Math.round((1 - Number(product.price) / Number(product.compareAtPrice)) * 100)}% OFF
+            {discountPct > 0 && (
+              <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-rose-500/75 backdrop-blur-sm text-[10px] text-white font-semibold">
+                -{discountPct}%
               </div>
             )}
           </div>
 
-          {/* Info */}
-          <div className="p-4">
-            <h3 className="text-sm font-medium text-white/90 line-clamp-2 min-h-[2.5rem] group-hover:text-purple-300 transition-colors">
+          <div className="p-3.5">
+            <h3 className="text-sm font-medium text-white/85 line-clamp-2 min-h-[2.4rem] group-hover:text-purple-300 transition-colors leading-snug">
               {product.name}
             </h3>
 
-            <div className="mt-2">
+            <div className="mt-1.5">
               <StarRating rating={Number(product.rating ?? 0)} reviewCount={product.reviewCount ?? 0} />
             </div>
 
             <div className="mt-3 flex items-center justify-between">
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-bold text-white">${Number(product.price).toFixed(2)}</span>
-                {product.compareAtPrice && Number(product.compareAtPrice) > 0 && (
-                  <span className="text-sm text-gray-500 line-through">
-                    ${Number(product.compareAtPrice).toFixed(2)}
-                  </span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-base font-bold text-white">${price.toFixed(2)}</span>
+                {compare > 0 && (
+                  <span className="text-xs text-white/30 line-through">${compare.toFixed(2)}</span>
                 )}
               </div>
-
               <button
-                onClick={handleAddToCart}
+                onClick={handleCart}
                 disabled={addToCart.isPending}
-                className="p-2.5 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 transition-all hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50"
+                className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 transition-all hover:shadow-md hover:shadow-purple-500/20 disabled:opacity-40"
               >
-                <ShoppingCart size={16} className="text-white" />
+                <ShoppingCart size={14} className="text-white" />
               </button>
             </div>
           </div>
         </div>
       </GlassCard>
-    </motion.div>
+    </div>
   );
 }
